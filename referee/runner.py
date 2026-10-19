@@ -70,6 +70,7 @@ def load_bots(path='bots.json'):
         entries = list(entries) + extra
     if not isinstance(entries, list) or not entries:
         raise ValueError('bots.json must be a list of bots')
+    entries = list(entries) + discover_bots(path.parent, entries)
     names = set()
     for bot in entries:
         name = bot.get('name')
@@ -88,6 +89,44 @@ def load_bots(path='bots.json'):
             bot[key] = [_resolve(x, cwd) for x in cmd]
         bot['cwd'] = str(cwd)
     return entries
+
+
+def discover_bots(root, listed):
+    """Bots dropped into bots/ without a roster entry: any folder (other than templates/ and
+    samples/) that holds a bot.py, bot.jl or bot.cpp is registered under the folder's name.
+
+    A folder already named in bots.json / bots.local.json is left alone, so an entry there
+    can override the guessed command. Folders under bots/ are ignored by git, so this is
+    how the players' bots get in without ever touching a tracked file.
+    """
+    root = Path(root)
+    bots_dir = root / 'bots'
+    if not bots_dir.is_dir():
+        return []
+    taken_dirs = {str((root / b.get('cwd', '.')).resolve()) for b in listed if isinstance(b, dict)}
+    taken_names = {b.get('name') for b in listed if isinstance(b, dict)}
+    found = []
+    for folder in sorted(p for p in bots_dir.iterdir() if p.is_dir()):
+        if folder.name in ('templates', 'samples') or folder.name.startswith(('.', '_')):
+            continue
+        if str(folder.resolve()) in taken_dirs:
+            continue
+        rel = folder.relative_to(root).as_posix()
+        if (folder / 'bot.py').is_file():
+            entry = {'name': folder.name, 'cwd': rel, 'command': ['{python}', 'bot.py']}
+        elif (folder / 'bot.jl').is_file():
+            entry = {'name': folder.name, 'cwd': rel, 'command': ['julia', '--startup-file=no', 'bot.jl']}
+        elif (folder / 'bot.cpp').is_file():
+            entry = {'name': folder.name, 'cwd': rel, 'command': ['./bot'],
+                     'build': ['{python}', 'build.py'] if (folder / 'build.py').is_file()
+                     else ['c++', '-std=c++17', '-O2', 'bot.cpp', '-o', 'bot']}
+        else:
+            continue                                   # nothing recognisable: list it in bots.local.json
+        if entry['name'] in taken_names:
+            entry['name'] = f"{entry['name']} ({rel})"
+        found.append(entry)
+        taken_names.add(entry['name'])
+    return found
 
 
 _built = {}   # bot folder -> fingerprint of its files right after the last successful build

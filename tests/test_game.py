@@ -327,6 +327,20 @@ class Roster(unittest.TestCase):
             (d / 'bots.local.json').write_text(json.dumps([{'name': 'B', 'cwd': 'b', 'command': ['y']}]), encoding='utf-8')
             self.assertEqual([b['name'] for b in load_bots(d / 'bots.json')], ['A', 'B'])
 
+    def test_dropped_in_folders_are_discovered(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            (d / 'bots' / 'carol').mkdir(parents=True); (d / 'bots' / 'carol' / 'bot.jl').write_text('')
+            (d / 'bots' / 'dave').mkdir(); (d / 'bots' / 'dave' / 'bot.cpp').write_text('')
+            (d / 'bots' / 'notes').mkdir(); (d / 'bots' / 'notes' / 'readme.txt').write_text('')
+            (d / 'bots' / 'samples' / 'x').mkdir(parents=True); (d / 'bots' / 'samples' / 'x' / 'bot.py').write_text('')
+            (d / 'bots.json').write_text(json.dumps([{'name': 'X', 'cwd': 'bots/samples/x', 'command': ['{python}', 'bot.py']}]), encoding='utf-8')
+            bots = {b['name']: b for b in load_bots(d / 'bots.json')}
+            self.assertEqual(sorted(bots), ['X', 'carol', 'dave'])
+            self.assertEqual(bots['carol']['command'][0], 'julia')
+            self.assertEqual(bots['dave']['command'][0].split('/')[-1], 'bot')
+            self.assertIn('build', bots['dave'])
+
 
 class Samples(unittest.TestCase):
     def test_roster_and_python_sample(self):

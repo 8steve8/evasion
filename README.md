@@ -224,9 +224,11 @@ Do not print to standard output: it carries your moves. Print debugging output t
 
 Restart the server (or refresh the page) and your bot appears in the pairing menus.
 
-For the organiser: entries in **`bots.local.json`** (same format, next to `bots.json`) are added to the
-roster too. That file, and every folder under `bots/` other than `templates/` and `samples/`, is ignored
-by git, so the players' bots never end up in the public repository.
+For the organiser: any folder dropped into `bots/` that contains a `bot.py`, `bot.jl` or `bot.cpp` is
+**picked up automatically** under the folder's name (press **Rescan folder** or refresh the page). For a
+bot with a different layout, or to rename one, add an entry to **`bots.local.json`** (same format as
+`bots.json`, next to it). Those folders and that file are ignored by git, so the players' bots never end
+up in the public repository.
 
 </details>
 
