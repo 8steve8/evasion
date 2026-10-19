@@ -115,7 +115,7 @@ def discover_bots(root, listed):
         if (folder / 'bot.py').is_file():
             entry = {'name': folder.name, 'cwd': rel, 'command': ['{python}', 'bot.py']}
         elif (folder / 'bot.jl').is_file():
-            entry = {'name': folder.name, 'cwd': rel, 'command': ['julia', '--startup-file=no', 'bot.jl']}
+            entry = {'name': folder.name, 'cwd': rel, 'command': ['julia', '-t', 'auto', '--startup-file=no', 'bot.jl']}
         elif (folder / 'bot.cpp').is_file():
             entry = {'name': folder.name, 'cwd': rel, 'command': ['./bot'],
                      'build': ['{python}', 'build.py'] if (folder / 'build.py').is_file()

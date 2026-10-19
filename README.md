@@ -214,7 +214,7 @@ Do not print to standard output: it carries your moves. Print debugging output t
 ```json
 {"name": "Alice", "cwd": "bots/alice", "command": ["{python}", "bot.py"]}
 {"name": "Bob",   "cwd": "bots/bob",   "command": ["./bot"], "build": ["{python}", "build.py"]}
-{"name": "Carol", "cwd": "bots/carol", "command": ["julia", "--startup-file=no", "bot.jl"]}
+{"name": "Carol", "cwd": "bots/carol", "command": ["julia", "-t", "auto", "--startup-file=no", "bot.jl"]}
 ```
 
 - `name`: shown on the dashboard; must be unique.
@@ -342,7 +342,7 @@ The prey receives a `tick` message only on odd ticks. The referee closes the bot
 |---|---|---|
 | Python | **3.8 or newer** | python.org or Anaconda. Check: `python3 --version` (Windows: `python --version`) |
 | C++ | a **C++17** compiler (g++ 7+, clang 5+, Visual Studio 2017+) | Mac: `xcode-select --install` (after a macOS update, if linking fails with *unknown architecture*, `build.py` retries with your older SDKs; or set `SDKROOT` to one of `/Library/Developer/CommandLineTools/SDKs/`). Windows: MinGW-w64 (`g++`) or Visual Studio Build Tools. Linux: `g++` |
-| Julia | **1.6 or newer** | julialang.org. Check: `julia --version` |
+| Julia | **1.6 or newer** | julialang.org. Check: `julia --version`. Bots are started with `-t auto`, so `Threads.@threads` and friends get every core; the bots never run at the same time, so that is safe |
 
 <details>
 <summary><b>What's in each folder</b></summary>

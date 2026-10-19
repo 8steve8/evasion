@@ -1,6 +1,6 @@
 [
   {"name": "Box (Python)", "cwd": "bots/samples/box-python", "command": ["{python}", "bot.py"]},
   {"name": "Box (C++)", "cwd": "bots/samples/box-cpp", "command": ["./bot"], "build": ["{python}", "build.py"]},
-  {"name": "Box (Julia)", "cwd": "bots/samples/box-julia", "command": ["julia", "--startup-file=no", "bot.jl"]},
+  {"name": "Box (Julia)", "cwd": "bots/samples/box-julia", "command": ["julia", "-t", "auto", "--startup-file=no", "bot.jl"]},
   {"name": "Slow (Python)", "cwd": "bots/samples/slow-python", "command": ["{python}", "bot.py"]}
 ]
