@@ -1,0 +1,4 @@
+# quick practice game: N M tick_cap
+20
+8
+3000

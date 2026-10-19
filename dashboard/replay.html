@@ -1,0 +1,263 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Evasion • Match desk</title>
+<style>
+:root{--bg:#101923;--card:#1b2937;--line:#304354;--ink:#e9f0f5;--muted:#91a6b9;--teal:#45d3b0;--amber:#efb35e;--red:#ff8a80;--field:#132130}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px system-ui,sans-serif}
+main{max-width:1160px;margin:14px auto;padding:12px 16px}
+small{color:var(--muted);letter-spacing:2px;font-size:12px}h1{font-size:26px;margin:4px 0 2px}h2{font-size:18px;margin:0 0 10px}
+.sub{color:#a8b9c9;line-height:1.5;margin:0 0 12px;font-size:14px}
+main{max-width:1500px}
+.desk{display:grid;grid-template-columns:minmax(260px,320px) minmax(0,1fr) minmax(260px,320px);gap:16px;align-items:start}
+.center{display:grid;gap:16px;min-width:0}
+canvas{width:min(100%,calc(100vh - 430px));min-width:280px}
+.compact canvas{width:min(100%,calc(100vh - 330px))}
+@media(max-width:1000px){.desk{grid-template-columns:1fr 1fr}.center.main{grid-column:1 / -1;order:-1}canvas{width:min(100%,640px)}}
+@media(max-width:640px){.desk{grid-template-columns:1fr}}
+.card{background:var(--card);padding:16px;border:1px solid var(--line);border-radius:16px;min-width:0}
+.card.hunter{border-top:3px solid var(--red)}.card.prey{border-top:3px solid var(--teal)}
+canvas{aspect-ratio:1;display:block;margin:0 auto;background:#0b1118;border:1px solid var(--line);border-radius:6px;image-rendering:pixelated}
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin:12px 0 0;font-size:14px;color:#b5c6d4}.legend span::before{content:"";display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.legend .h::before{background:var(--red)}.legend .p::before{background:var(--teal)}.legend .w::before{background:#c7d3de;border-radius:2px}
+.stat{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;font-size:15px}.stat:last-child{border-bottom:0}
+.stat b{font-weight:600;text-align:right}.muted{color:var(--muted)}.low{color:var(--red)}.ok{color:var(--teal)}
+.who{display:flex;align-items:center;gap:10px;margin:0 0 8px}.who h2{margin:0;overflow-wrap:anywhere}.dot{width:14px;height:14px;border-radius:50%;flex:none}
+.role{font-size:12px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase}
+.big{font-size:26px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.kpi{background:var(--field);border:1px solid var(--line);border-radius:10px;padding:10px 12px}.kpi .lbl{font-size:12px;color:var(--muted)}
+.sb{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:14px;margin-top:6px}
+.sb th,.sb td{padding:7px 5px;border-bottom:1px solid var(--line);text-align:left}.sb td.num,.sb th.num,.sb td:first-child,.sb th:first-child{white-space:nowrap}.sb th{color:var(--muted);font-weight:500;font-size:12px}
+.sb td.num,.sb th.num{text-align:right}.sb tr.g{cursor:pointer}.sb tr.g:hover td{background:#22384a}.sb tr.cur td{background:#203447}
+.tag{display:inline-block;border-radius:999px;padding:0 8px;font-size:12px;background:var(--field);border:1px solid var(--line)}.tag.win{color:var(--teal);border-color:var(--teal)}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px}
+button{background:var(--teal);color:#10241f;border:0;border-radius:7px;padding:9px 14px;font:600 14px system-ui,sans-serif;cursor:pointer}
+button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}button:disabled{opacity:.4;cursor:default}
+select{background:var(--field);color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:7px 9px;font:inherit}
+input[type=range]{width:100%;margin:12px 0 4px}
+.log{font:12px ui-monospace,monospace;line-height:1.5;color:#b5c6d4;max-height:260px;overflow:auto;background:var(--field);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:10px;white-space:pre-wrap}
+.log .bad{color:var(--red)}.log .ok{color:var(--teal)}.log:empty::before{content:"nothing yet";color:var(--muted)}
+.budget{height:6px;background:var(--field);border-radius:4px;overflow:hidden;margin:6px 0 2px}.budget div{height:100%;background:var(--teal);transition:width .2s}.budget div.low{background:var(--red)}
+.compact main{margin:0 auto;padding:4px 2px}.compact body{background:transparent}.compact .hide{display:none}
+</style>
+<main>
+  <header class="hide"><small>EVASION</small><h1 id="title">Match desk</h1><p class="sub" id="sub"></p></header>
+  <div class="desk">
+    <section class="card hunter">
+      <div class="who"><span class="dot" style="background:var(--red)"></span><div><div class="role">Hunter</div><h2 id="hname">Hunter</h2></div></div>
+      <div class="stat"><span>Position</span><b id="h_pos"></b></div>
+      <div class="stat"><span>Heading into this tick</span><b id="h_in"></b></div>
+      <div class="stat"><span>Velocity after moving</span><b id="h_out"></b></div>
+      <div class="stat"><span>Budget left</span><b id="h_left"></b></div>
+      <div class="budget"><div id="h_bar"></div></div>
+      <div class="stat"><span class="muted">Budget used</span><b id="h_used" class="muted"></b></div>
+      <div class="stat"><span>Walls built so far</span><b id="h_built"></b></div>
+      <div class="stat"><span>Walls standing</span><b id="h_standing"></b></div>
+      <div class="stat"><span>Next wall allowed</span><b id="h_next"></b></div>
+      <div class="log" id="h_log"></div>
+    </section>
+
+    <div class="center main">
+      <section class="card">
+        <div class="kpis">
+          <div class="kpi"><div class="lbl" id="gamehead">Game</div><div class="big" id="tick">0</div><div class="lbl">tick</div></div>
+          <div class="kpi"><div class="lbl">Distance</div><div class="big" id="dist">–</div><div class="lbl">catch at ≤ 4, clear line</div></div>
+          <div class="kpi"><div class="lbl">Walls standing</div><div class="big" id="nwalls">0</div><div class="lbl">of M</div></div>
+          <div class="kpi"><div class="lbl">This tick</div><div class="big" id="turn" style="font-size:17px;padding-top:6px"></div></div>
+          <div class="kpi"><div class="lbl">Status</div><div id="status" style="font-size:13.5px;line-height:1.35;padding-top:4px"></div></div>
+        </div>
+      </section>
+      <section class="card">
+        <canvas id="arena" width="300" height="300" aria-label="The arena"></canvas>
+        <div class="legend"><span class="h">Hunter</span><span class="p">Prey</span><span class="w">Walls</span><span id="cap" class="muted"></span></div>
+        <div id="replayctl" hidden>
+          <input type="range" id="slider" min="0" max="0" value="0" aria-label="Tick">
+          <div class="controls">
+            <button class="ghost" id="first" aria-label="First tick">⏮</button><button class="ghost" id="prev" aria-label="Back one tick">◀</button>
+            <button id="play">Play</button><button class="ghost" id="next" aria-label="Forward one tick">▶</button><button class="ghost" id="last" aria-label="Last tick">⏭</button>
+            <label class="muted" style="font-size:14px">Speed <select id="speed"><option value="10">10 ticks/s</option><option value="50">50 ticks/s</option><option value="200" selected>200 ticks/s</option><option value="1000">1000 ticks/s</option></select></label>
+            <span class="muted" style="font-size:13px">(arrow keys step, space plays)</span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="center">
+    <section class="card prey">
+      <div class="who"><span class="dot" style="background:var(--teal)"></span><div><div class="role">Prey</div><h2 id="pname">Prey</h2></div></div>
+      <div class="stat"><span>Position</span><b id="p_pos"></b></div>
+      <div class="stat"><span>Requested velocity</span><b id="p_in"></b></div>
+      <div class="stat"><span>Velocity after moving</span><b id="p_out"></b></div>
+      <div class="stat"><span>Budget left</span><b id="p_left"></b></div>
+      <div class="budget"><div id="p_bar"></div></div>
+      <div class="stat"><span class="muted">Budget used</span><b id="p_used" class="muted"></b></div>
+      <div class="stat"><span>Moves on</span><b class="muted">odd ticks (1, 3, 5, …)</b></div>
+      <div class="stat"><span>Next move</span><b id="p_next"></b></div>
+      <div class="log" id="p_log"></div>
+    </section>
+    <section class="card">
+        <h2>Scoreboard</h2>
+        <div style="overflow-x:auto"><table class="sb"><thead><tr><th>Game</th><th>Hunter</th><th>Prey</th><th class="num">Ticks</th><th>Ended</th></tr></thead><tbody id="score"></tbody></table></div>
+        <p id="winner" style="margin:10px 0 0"></p>
+    </section>
+    </div>
+  </div>
+</main>
+<script>
+const REPLAY = /* REPLAY_DATA */ null;
+const LIVE = !REPLAY;
+const $ = id => document.getElementById(id);
+let BUDGET = 120, PARAMS = {};
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+if (location.search.includes('compact') || (LIVE && window.self !== window.top)) document.documentElement.classList.add('compact');
+
+// ---- drawing ----
+const cv = $('arena'), ctx = cv.getContext('2d');
+const S = 3; cv.width = 300 * S; cv.height = 300 * S;         // 3 canvas pixels per arena unit
+function wallCells(w) {                                          // same rule as the referee
+  let [x1, y1, x2, y2] = w; if (x2 < x1 || (x2 === x1 && y2 < y1)) [x1, y1, x2, y2] = [x2, y2, x1, y1];
+  const out = [];
+  if (y1 === y2) for (let x = x1; x <= x2; x++) out.push([x, y1]);
+  else for (let y = y1; y <= y2; y++) out.push([x1, y]);
+  return out;
+}
+function draw(now, trail) {
+  ctx.fillStyle = '#0b1118'; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.strokeStyle = '#1d2b39'; ctx.lineWidth = 1;
+  for (let k = 50; k < 300; k += 50) { ctx.beginPath(); ctx.moveTo(k * S, 0); ctx.lineTo(k * S, 300 * S); ctx.moveTo(0, k * S); ctx.lineTo(300 * S, k * S); ctx.stroke(); }
+  ctx.fillStyle = '#c7d3de';
+  for (const w of now.walls) for (const [x, y] of wallCells(w)) ctx.fillRect(x * S, y * S, S, S);
+  if (trail) { ctx.strokeStyle = 'rgba(255,138,128,.35)'; ctx.lineWidth = 1.5; ctx.beginPath();
+    trail.forEach((f, i) => { const X = f[0] * S + S / 2, Y = f[1] * S + S / 2; i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }); ctx.stroke(); }
+  ctx.beginPath(); ctx.arc(now.hx * S + S / 2, now.hy * S + S / 2, 4 * S, 0, 2 * Math.PI); ctx.strokeStyle = 'rgba(255,138,128,.45)'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.fillStyle = '#ff8a80'; ctx.beginPath(); ctx.arc(now.hx * S + S / 2, now.hy * S + S / 2, 2.2 * S, 0, 2 * Math.PI); ctx.fill();
+  ctx.fillStyle = '#45d3b0'; ctx.beginPath(); ctx.arc(now.px * S + S / 2, now.py * S + S / 2, 2.2 * S, 0, 2 * Math.PI); ctx.fill();
+  if (now.caught) { ctx.strokeStyle = '#efb35e'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(now.px * S + S / 2, now.py * S + S / 2, 7 * S, 0, 2 * Math.PI); ctx.stroke(); }
+}
+
+// ---- the two player logs, split out of the referee's events ----
+const fmtWall = w => `(${w[0]},${w[1]})–(${w[2]},${w[3]})`;
+function splitEvents(evs) {
+  const h = [], p = [];
+  for (const e of evs) {
+    const hb = [], pb = [];
+    if (e.error) { const w = e.error.what === 'time' ? 'ran out of thinking time' : e.error.what; (e.error.role === 'prey' ? pb : hb).push(`<span class="bad">${esc(w)}${e.error.role === 'prey' ? ' → caught here' : ' → scored as the tick cap'}</span>`); }
+    if (e.removed) hb.push('removed ' + e.removed.map(fmtWall).join(', '));
+    if (e.created) hb.push(`<span class="ok">built ${fmtWall(e.created)}</span>`);
+    for (const n of e.notes || []) (n.startsWith('prey') ? pb : hb).push(`<span class="bad">${esc(n)}</span>`);
+    if (e.caught) { hb.push(`<span class="ok">caught the prey (tick ${e.tick + 1})</span>`); pb.push(`<span class="bad">caught (tick ${e.tick + 1})</span>`); }
+    if (hb.length) h.push(`t=${e.tick}: ${hb.join('; ')}`);
+    if (pb.length) p.push(`t=${e.tick}: ${pb.join('; ')}`);
+  }
+  return [h, p];
+}
+function showLogs(evs) {
+  const [h, p] = splitEvents(evs);
+  $('h_log').innerHTML = h.slice(-40).join('\n'); $('p_log').innerHTML = p.slice(-40).join('\n');
+  $('h_log').scrollTop = $('p_log').scrollTop = 1e9;
+}
+
+// ---- the cards ----
+const v = (x, y) => `(${x > 0 ? '+' : ''}${x}, ${y > 0 ? '+' : ''}${y})`;
+function budget(prefix, left, thinking) {
+  if (left == null) { $(prefix + '_left').textContent = '–'; $(prefix + '_used').textContent = ''; $(prefix + '_bar').style.width = '0'; return; }
+  const low = left < 0.1 * BUDGET;
+  $(prefix + '_left').innerHTML = `<span class="${low ? 'low' : ''}">${left.toFixed(2)} s${thinking ? ' <span class="muted">thinking…</span>' : ''}</span>`;
+  $(prefix + '_used').textContent = `${Math.max(0, BUDGET - left).toFixed(2)} s of ${BUDGET} s`;
+  const bar = $(prefix + '_bar'); bar.style.width = (100 * Math.max(0, left) / BUDGET) + '%'; bar.className = low ? 'low' : '';
+}
+function panel(now, tick, clocks, thinking) {
+  const N = PARAMS.N, M = PARAMS.M;
+  $('tick').textContent = tick;
+  const d = Math.hypot(now.hx - now.px, now.hy - now.py); $('dist').textContent = d.toFixed(1); $('dist').className = 'big' + (d <= 8 ? ' low' : '');
+  $('nwalls').textContent = M != null ? `${now.walls.length} / ${M}` : now.walls.length;
+  $('turn').textContent = tick % 2 === 1 ? 'hunter + prey move' : 'hunter moves';
+  // hunter
+  $('h_pos').textContent = `(${now.hx}, ${now.hy})`;
+  const hb = now.heading_h && (now.heading_h[0] !== now.hvx || now.heading_h[1] !== now.hvy);
+  $('h_in').textContent = now.heading_h ? v(...now.heading_h) : '–';
+  $('h_out').innerHTML = v(now.hvx, now.hvy) + (hb ? ' <span class="muted">bounced</span>' : '');
+  budget('h', clocks ? clocks[0] : null, thinking && thinking[0]);
+  $('h_built').textContent = now.walls_built != null ? now.walls_built : '–';
+  $('h_standing').textContent = M != null ? `${now.walls.length} of ${M}` : now.walls.length;
+  const wait = now.last_wall < 0 || N == null ? 0 : Math.max(0, now.last_wall + N - tick);
+  $('h_next').innerHTML = wait === 0 ? '<span class="ok">now</span>' : `in ${wait} tick${wait > 1 ? 's' : ''}`;
+  // prey
+  $('p_pos').textContent = `(${now.px}, ${now.py})`;
+  const pb = now.heading_p && (now.heading_p[0] !== now.pvx || now.heading_p[1] !== now.pvy);
+  $('p_in').textContent = now.heading_p ? v(...now.heading_p) : '–';
+  $('p_out').innerHTML = v(now.pvx, now.pvy) + (pb ? ' <span class="muted">bounced</span>' : '');
+  budget('p', clocks ? clocks[1] : null, thinking && thinking[1]);
+  $('p_next').textContent = tick % 2 === 0 ? 'next tick' : 'this tick';
+}
+function scoreboard(games, cur) {
+  $('score').innerHTML = games.map(g => `<tr class="g ${g.game === cur ? 'cur' : ''}" data-g="${g.game}"><td>${g.game}</td><td>${esc(g.hunter)}</td><td>${esc(g.prey)}</td><td class="num">${g.ticks != null ? g.ticks : (g.tick || 0)}</td><td>${g.status === 'finished' ? esc(g.ended) : esc(g.status || '')}</td></tr>`).join('');
+  const done = games.filter(g => g.status === 'finished');
+  if (done.length === 2) { const [a, b] = done;
+    const w = a.ticks < b.ticks ? a.hunter : b.ticks < a.ticks ? b.hunter : null;
+    $('winner').innerHTML = w ? `Winner: <span class="tag win">${esc(w)}</span> <span class="muted" style="font-size:13px">(its hunter needed fewer ticks)</span>` : `<span class="tag">Tie</span> <span class="muted" style="font-size:13px">(same number of ticks)</span>`; }
+  else $('winner').textContent = '';
+}
+function names(g) { $('gamehead').textContent = `Game ${g.game} of 2`; $('hname').textContent = g.hunter; $('pname').textContent = g.prey; }
+
+if (LIVE) {
+  // ---- live view: ask the referee what is happening right now ----
+  $('title').textContent = 'Live match'; $('cap').textContent = 'live';
+  let lastTick = -1, trail = [], lastGame = 0;
+  async function poll() {
+    let s; try { s = await (await fetch('/state')).json(); } catch (e) { $('status').textContent = 'Dashboard server is not running.'; return; }
+    $('status').textContent = s.status || '';
+    if (!s.names || !s.names.length) return;
+    const games = s.games || [], g = games[games.length - 1];
+    if (g) { names(g); if (g.game !== lastGame) { trail = []; lastGame = g.game; } }
+    BUDGET = s.time_budget || 120; PARAMS = s.params || {};
+    $('sub').textContent = `${s.names[0]} vs ${s.names[1]} · N = ${PARAMS.N}, M = ${PARAMS.M}, tick cap ${PARAMS.tick_cap}`;
+    scoreboard(games, g && g.game);
+    if (s.now) { const now = s.now; now.caught = g && g.caught;
+      if (now.walls.length && !Array.isArray(now.walls[0])) { const fl = now.walls, ws = []; for (let i = 0; i + 3 < fl.length; i += 4) ws.push(fl.slice(i, i + 4)); now.walls = ws; }
+      if (now.tick !== lastTick) { trail.push([now.hx, now.hy]); if (trail.length > 120) trail.shift(); lastTick = now.tick; }
+      draw(now, trail); panel(now, now.tick, s.live_clocks, s.thinking); }
+    if (s.events) showLogs(s.events);
+  }
+  poll(); setInterval(poll, 60);
+} else {
+  // ---- replay: everything is in REPLAY ----
+  const R = REPLAY; PARAMS = R.params || {}; BUDGET = R.time_budget || 120;
+  $('title').textContent = `${R.names[0]} vs ${R.names[1]}`; $('cap').textContent = 'replay';
+  $('sub').textContent = `N = ${PARAMS.N}, M = ${PARAMS.M}, tick cap ${PARAMS.tick_cap} · ${R.config || ''}`;
+  $('replayctl').hidden = false;
+  let gi = 0, t = 0, timer = null;
+  const game = () => R.games[gi];
+  function wallsBefore(tick) {              // walls standing after `tick` ticks, replayed from the events
+    const set = new Map(); let built = 0, last = -1;
+    for (const e of game().events || []) { if (e.tick >= tick) break;
+      if (e.removed) for (const w of e.removed) set.delete(w.join(','));
+      if (e.created) { set.set(e.created.join(','), e.created); built++; last = e.tick; } }
+    return { walls: [...set.values()], built, last };
+  }
+  function show() {
+    const g = game(), fr = g.frames || [[0, 0, 1, 1, 230, 200, 0, 0]]; t = Math.max(0, Math.min(t, fr.length - 1));
+    const played = g.played != null ? g.played : fr.length - 1, tick = Math.min(t, played);   // a game that ended on a failed ask has one extra frame
+    const f = fr[t], wb = wallsBefore(tick);
+    const now = { tick, hx: f[0], hy: f[1], hvx: f[2], hvy: f[3], px: f[4], py: f[5], pvx: f[6], pvy: f[7],
+      heading_h: f.length > 13 ? [f[10], f[11]] : null, heading_p: f.length > 13 ? [f[12], f[13]] : null,
+      walls: wb.walls, walls_built: wb.built, last_wall: wb.last, caught: g.caught && t === fr.length - 1 };
+    draw(now, fr.slice(Math.max(0, t - 120), t + 1)); panel(now, tick, f.length > 9 ? [f[8], f[9]] : null);
+    $('slider').max = fr.length - 1; $('slider').value = t;
+    names(g);
+    $('status').textContent = t === fr.length - 1 ? `Game over after ${g.ticks} ticks (${g.ended})` : 'in progress';
+    const last = t === fr.length - 1;                       // errors are logged at the tick they were asked on
+    showLogs((g.events || []).filter(e => last || e.tick < tick || (e.error && e.tick <= tick)));
+    scoreboard(R.games, g.game);
+    $('play').textContent = timer ? 'Pause' : 'Play';
+  }
+  function play() { if (timer) { clearInterval(timer); timer = null; show(); return; }
+    const rate = +$('speed').value, per = Math.max(1, Math.round(rate / 50)), ms = 1000 * per / rate;
+    timer = setInterval(() => { if (t >= game().frames.length - 1) { clearInterval(timer); timer = null; show(); return; } t += per; show(); }, ms); show(); }
+  $('play').onclick = play; $('next').onclick = () => { t++; show(); }; $('prev').onclick = () => { t--; show(); };
+  $('first').onclick = () => { t = 0; show(); }; $('last').onclick = () => { t = 1e9; show(); };
+  $('slider').oninput = () => { t = +$('slider').value; show(); };
+  $('speed').onchange = () => { if (timer) { clearInterval(timer); timer = null; play(); } };
+  $('score').onclick = e => { const tr = e.target.closest('tr[data-g]'); if (!tr) return; const k = R.games.findIndex(g => g.game === +tr.dataset.g); if (k >= 0 && k !== gi) { gi = k; t = 0; show(); } };
+  document.addEventListener('keydown', e => { if (e.key === 'ArrowRight') { t += e.shiftKey ? 50 : 1; show(); } else if (e.key === 'ArrowLeft') { t -= e.shiftKey ? 50 : 1; show(); } else if (e.key === ' ') { e.preventDefault(); play(); } });
+  show();
+}
+</script>

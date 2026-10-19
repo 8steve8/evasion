@@ -1,0 +1,172 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Evasion Tournament Desk</title>
+<style>
+:root{--bg:#101923;--card:#1b2937;--line:#304354;--ink:#e9f0f5;--muted:#91a6b9;--teal:#45d3b0;--amber:#efb35e;--red:#ff8a80;--field:#132130}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;padding:28px 16px 60px}
+main{max-width:1200px;margin:0 auto;display:grid;gap:18px}
+small.kicker{color:var(--muted);letter-spacing:2px;font-size:12px}
+h1{font-size:38px;margin:6px 0 0;line-height:1.1}
+h2{font-size:18px;margin:0 0 10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;min-width:0}
+@media(max-width:760px){h1{font-size:30px}}
+.muted{color:var(--muted)} .err{color:var(--red);min-height:1.4em}
+.botlist{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:flex;align-items:center;gap:6px;background:var(--field);border:1px solid var(--line);border-radius:999px;padding:5px 12px}
+.row{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin:10px 0}
+select,input[type=text],input[type=number]{background:var(--field);color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:6px 9px;font:inherit;max-width:100%}
+button{background:var(--teal);color:#10241f;border:0;border-radius:8px;padding:9px 16px;font:600 14px system-ui,sans-serif;cursor:pointer}
+button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+button.stop{background:var(--red);color:#2b0f0c}
+button:disabled{opacity:.4;cursor:default}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}
+th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{color:var(--muted);font-weight:500;font-size:12.5px}
+td.num,th.num{text-align:right}
+tr.now td{background:#22384a}
+.tag{display:inline-block;border-radius:999px;padding:0 8px;font-size:12px;background:var(--field);border:1px solid var(--line)}
+.tag.win{color:var(--teal);border-color:var(--teal)} .tag.fail{color:var(--red);border-color:var(--red)}
+a{color:var(--teal)}
+.progress{height:6px;background:var(--field);border-radius:4px;overflow:hidden;margin-top:8px}
+.progress div{height:100%;background:var(--amber);transition:width .3s}
+code{background:var(--field);padding:1px 5px;border-radius:4px}
+</style>
+<main>
+  <header><small class="kicker">COMPETITION / EVASION</small><h1>Tournament desk</h1>
+    <p class="muted">Pick the bots, choose who plays whom and which parameter file each pairing uses, then start. In each pairing Bot 1 hunts Bot 2, then Bot 2 hunts Bot 1; the team whose hunter needs fewer ticks wins.</p></header>
+
+  <section class="card" id="setup">
+    <h2>1. Bots</h2>
+    <p class="muted" style="margin:0 0 8px">Loaded from <code>bots.json</code>. Pick who plays whom in step 3.</p>
+    <div class="botlist" id="bots"></div>
+
+    <h2 style="margin-top:20px">2. Parameter presets</h2>
+    <div class="row"><span class="muted">Optional. Files in <code id="pdir">params/</code> fill in a pairing's N, M and tick cap with one click; you can also just type the numbers in step 3.</span><button class="ghost" id="rescan">Rescan folder</button><button class="ghost" id="newp">Add your own</button></div>
+    <div id="pform" hidden style="background:var(--field);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:6px 0 14px">
+      <div class="row" style="margin-top:0">
+        <label>Name <input type="text" id="pname" placeholder="my_game" style="width:160px"></label>
+        <label>N (ticks between walls) <input type="number" id="pn" placeholder="10" min="1" style="width:90px"></label>
+        <label>M (most walls at once) <input type="number" id="pm" placeholder="5" min="0" style="width:90px"></label>
+        <label>Tick cap <input type="number" id="pcap" placeholder="24000" min="1" style="width:110px"></label>
+      </div>
+      <div class="row" style="margin-bottom:0"><button id="psave">Save to params/</button><button class="ghost" id="pcancel">Cancel</button><span class="muted" id="pmsg"></span></div>
+    </div>
+    <div class="tablewrap"><table><thead><tr><th>File</th><th class="num">N</th><th class="num">M</th><th class="num">Tick cap</th></tr></thead><tbody id="params"></tbody></table></div>
+
+    <h2 style="margin-top:20px">3. Pairings</h2>
+    <p class="muted" style="margin:0 0 8px">Add each pairing and type its N (ticks between walls), M (most walls at once) and tick cap, or pick a preset. Bot 1 hunts in game 1, Bot 2 hunts in game 2.</p>
+    <div class="tablewrap"><table><thead><tr><th>#</th><th>Bot 1</th><th>Bot 2</th><th class="num">N</th><th class="num">M</th><th class="num">Tick cap</th><th>Preset</th><th></th></tr></thead><tbody id="plan"></tbody></table></div>
+    <div class="row"><button class="ghost" id="addPair">Add pairing</button><button class="ghost" id="allPairs">Every pair</button><span class="muted" id="planCount"></span></div>
+
+    <h2 style="margin-top:20px">4. Start</h2>
+    <p class="muted" style="margin:0">Each bot gets 120 seconds of thinking time per game (a fresh 120 s for game 2).</p>
+    <div class="row">
+      <button id="start">Start tournament</button><button class="stop" id="stop" disabled>Stop</button>
+      <label class="muted">Watching pace <select id="pace"><option value="0">full speed</option><option value="5" selected>5 ms per tick</option><option value="20">20 ms per tick</option><option value="50">50 ms per tick</option></select></label>
+      <span class="muted" style="font-size:13px">(slows the referee between ticks so you can watch; it never touches the bots' clocks; can be changed while running)</span>
+    </div>
+    <div class="err" id="err" role="alert"></div>
+  </section>
+
+  <section class="card"><h2>Live</h2><p id="status" class="muted">Idle.</p><div class="progress"><div id="prog" style="width:0"></div></div>
+    <iframe id="live" src="/live" title="Live match" style="width:100%;height:760px;border:0;margin-top:14px;background:transparent"></iframe></section>
+
+  <section class="card"><h2>Results</h2>
+    <div class="row" style="margin:0 0 10px"><button class="ghost" id="clear">Clear results</button><span class="muted" style="font-size:13px">Results add up across runs and survive a restart (saved in <code>results/all_results.json</code>).</span></div>
+    <div class="tablewrap"><table><thead><tr><th>#</th><th>Pairing</th><th>N · M · cap</th><th>Game 1 / Game 2 (ticks to catch)</th><th>Winner</th><th>Replay</th></tr></thead><tbody id="results"><tr><td colspan="6" class="muted">Results appear here as pairings finish.</td></tr></tbody></table></div>
+  </section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let SETUP={bots:[],params:[]}, custom=[], running=false;
+const okParams=()=>SETUP.params.filter(p=>!p.error);
+const botName=k=>(SETUP.bots.find(b=>b.key===k)||{name:k}).name;
+const fileOptions=sel=>'<option value="">custom</option>'+okParams().map(p=>`<option value="${esc(p.file)}" ${p.file===sel?'selected':''}>${esc(p.name)}</option>`).join('');
+const paramName=p=>p.params?`N ${p.params.N} · M ${p.params.M} · cap ${(+p.params.tick_cap).toLocaleString()}`:(okParams().find(f=>f.file===p.config)||{name:p.config}).name;
+const defaults=()=>{ const f=okParams()[0]; return f?{N:f.N,M:f.M,tick_cap:f.tick_cap}:{N:10,M:5,tick_cap:24000}; };
+
+async function loadSetup(){
+  SETUP=await (await fetch('/api/setup')).json();
+  $('pdir').textContent=SETUP.params_dir;
+  $('bots').innerHTML=SETUP.bots.map(b=>`<span class="chip">${esc(b.name)}</span>`).join('');
+  $('params').innerHTML=SETUP.params.length?SETUP.params.map(p=>p.error?`<tr><td>${esc(p.name)}</td><td colspan="3" style="color:var(--red)">${esc(p.error)}</td></tr>`:
+    `<tr><td>${esc(p.name)}</td><td class="num">${p.N}</td><td class="num">${p.M}</td><td class="num">${p.tick_cap.toLocaleString()}</td></tr>`).join('')
+    :`<tr><td colspan="4" class="muted">No .txt files in ${esc(SETUP.params_dir)}. Type N, M and the tick cap into each pairing instead.</td></tr>`;
+  if(!custom.length && SETUP.bots.length>1) custom.push({a:SETUP.bots[0].key,b:SETUP.bots[1].key,...defaults()});
+  renderPlan();
+}
+const presetFor=p=>{ const f=okParams().find(f=>f.N==p.N&&f.M==p.M&&f.tick_cap==p.tick_cap); return f?f.file:''; };
+function renderPlan(){
+  const botOpts=sel=>SETUP.bots.map(b=>`<option value="${esc(b.key)}" ${b.key===sel?'selected':''}>${esc(b.name)}</option>`).join('');
+  $('plan').innerHTML=custom.length?custom.map((p,i)=>`<tr>
+    <td>${i+1}</td>
+    <td><select data-i="${i}" data-f="a">${botOpts(p.a)}</select></td>
+    <td><select data-i="${i}" data-f="b">${botOpts(p.b)}</select></td>
+    <td class="num"><input type="number" min="1" data-i="${i}" data-f="N" value="${p.N}" style="width:70px" aria-label="N"></td>
+    <td class="num"><input type="number" min="0" data-i="${i}" data-f="M" value="${p.M}" style="width:70px" aria-label="M"></td>
+    <td class="num"><input type="number" min="1" data-i="${i}" data-f="tick_cap" value="${p.tick_cap}" style="width:100px" aria-label="Tick cap"></td>
+    <td><select data-i="${i}" data-f="preset" aria-label="Preset">${fileOptions(presetFor(p))}</select></td>
+    <td><button class="ghost" data-del="${i}" aria-label="Remove pairing ${i+1}">Remove</button></td></tr>`).join('')
+    :`<tr><td colspan="8" class="muted">Press "Add pairing" or "Every pair".</td></tr>`;
+  $('planCount').textContent=custom.length?`${custom.length} pairing${custom.length>1?'s':''}, ${2*custom.length} games`:'';
+  document.querySelectorAll('#plan select, #plan input').forEach(s=>s.onchange=()=>{ const p=custom[+s.dataset.i], f=s.dataset.f;
+    if(f==='preset'){ const file=okParams().find(q=>q.file===s.value); if(file){ p.N=file.N; p.M=file.M; p.tick_cap=file.tick_cap; renderPlan(); } return; }
+    p[f]=s.tagName==='INPUT'?+s.value:s.value;
+    if(s.tagName==='INPUT'){ const sel=s.closest('tr').querySelector('select[data-f="preset"]'); if(sel) sel.value=presetFor(p); } });
+  document.querySelectorAll('#plan [data-del]').forEach(b=>b.onclick=()=>{custom.splice(+b.dataset.del,1);renderPlan();});
+}
+$('addPair').onclick=()=>{ const ks=SETUP.bots.map(b=>b.key);
+  const used=new Set(custom.map(p=>[p.a,p.b].sort().join('|'))); let pick=[ks[0],ks[1]||ks[0]];
+  outer: for(let i=0;i<ks.length;i++) for(let j=i+1;j<ks.length;j++) if(!used.has([ks[i],ks[j]].sort().join('|'))){pick=[ks[i],ks[j]];break outer;}
+  const last=custom[custom.length-1], par=last?{N:last.N,M:last.M,tick_cap:last.tick_cap}:defaults();
+  custom.push({a:pick[0],b:pick[1],...par}); renderPlan(); };
+$('allPairs').onclick=()=>{ const ks=SETUP.bots.map(b=>b.key); const last=custom[custom.length-1], par=last?{N:last.N,M:last.M,tick_cap:last.tick_cap}:defaults(); custom=[];
+  for(let i=0;i<ks.length;i++) for(let j=i+1;j<ks.length;j++) custom.push({a:ks[i],b:ks[j],...par}); renderPlan(); };
+$('rescan').onclick=loadSetup;
+$('newp').onclick=()=>{ $('pform').hidden=false; $('pname').focus(); };
+$('pcancel').onclick=()=>{ $('pform').hidden=true; $('pmsg').textContent=''; };
+$('psave').onclick=async()=>{
+  $('pmsg').style.color=''; $('pmsg').textContent='Saving...';
+  const r=await fetch('/api/params',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:$('pname').value,N:$('pn').value,M:$('pm').value,tick_cap:$('pcap').value||24000})});
+  const j=await r.json();
+  if(!r.ok){ $('pmsg').style.color='var(--red)'; $('pmsg').textContent=j.error; return; }
+  $('pmsg').textContent='Saved as '+j.file; ['pname','pn','pm','pcap'].forEach(id=>$(id).value='');
+  await loadSetup(); setTimeout(()=>{ $('pform').hidden=true; $('pmsg').textContent=''; },1500);
+};
+$('pace').onchange=()=>fetch('/api/pace',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pace:+$('pace').value})});
+
+$('start').onclick=async()=>{
+  $('err').textContent='';
+  const r=await fetch('/api/start',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({pairings:custom.map(p=>({a:p.a,b:p.b,N:p.N,M:p.M,tick_cap:p.tick_cap})),pace:+$('pace').value})});
+  const j=await r.json(); if(!r.ok) $('err').textContent=j.error; else { $('live').closest('section').scrollIntoView({behavior:'smooth',block:'start'}); poll(); }
+};
+$('stop').onclick=()=>fetch('/api/stop',{method:'POST',body:'{}'});
+$('clear').onclick=async()=>{ if(!confirm('Clear all results? (A backup copy is kept in results/.)')) return;
+  const r=await fetch('/api/clear',{method:'POST',body:'{}'}); const j=await r.json(); $('err').textContent=r.ok?'':j.error; poll(); };
+
+async function poll(){
+  let s; try{ s=await (await fetch('/api/state')).json(); }catch(e){ $('status').textContent='Dashboard server is not running.'; return; }
+  running=s.status==='running';
+  $('start').disabled=running; $('stop').disabled=!running; $('clear').disabled=running;
+  $('status').textContent=s.message;
+  const mine=s.pairings.slice(s.run_from||0), done=mine.filter(p=>p.scores||p.error).length;
+  $('prog').style.width=mine.length?(100*done/mine.length)+'%':'0';
+  if(!s.pairings.length) $('results').innerHTML='<tr><td colspan="6" class="muted">Results appear here as pairings finish.</td></tr>';
+  else $('results').innerHTML=s.pairings.map((p,i)=>{
+    const [a,b]=p.bots; const name=paramName(p);
+    if(p.error) return `<tr><td>${i+1}</td><td>${esc(a)} vs ${esc(b)}</td><td>${esc(name)}</td><td colspan="2"><span class="tag fail">${esc(p.error.slice(0,80))}</span></td><td></td></tr>`;
+    if(!p.scores) return `<tr class="${i===s.current?'now':''}"><td>${i+1}</td><td>${esc(a)} vs ${esc(b)}</td><td>${esc(name)}</td><td colspan="3" class="muted">${i===s.current?'playing now':'waiting'}</td></tr>`;
+    const games=(p.games||[]).map(g=>`<div style="font-size:13px">G${g.game}: ${esc(g.hunter)} <span class="muted">hunts</span> ${esc(g.prey)}: <b>${g.ticks!=null?g.ticks.toLocaleString():'?'}</b> <span class="muted">(${esc(g.ended||'')})</span></div>`).join('');
+    return `<tr><td>${i+1}</td><td>${esc(a)} vs ${esc(b)}</td><td>${esc(name)}</td><td>${games}</td><td><span class="tag ${p.winner?'win':''}">${esc(p.winner||'Tie')}</span></td><td><a href="${esc(p.replay)}" target="_blank" rel="noopener">Open</a></td></tr>`;
+  }).join('');
+}
+// size the live view to its content (same page as the replays)
+setInterval(()=>{ try{ const f=$('live'), h=f.contentDocument.documentElement.scrollHeight; if(h&&Math.abs(f.offsetHeight-h)>4) f.style.height=h+'px'; }catch(e){} },300);
+loadSetup().then(poll); setInterval(()=>{ if(running) poll(); },800);
+</script>

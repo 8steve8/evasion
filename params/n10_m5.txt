@@ -1,0 +1,3 @@
+# Ticks the hunter must wait between walls (N), then the most walls at once (M)
+10
+5
