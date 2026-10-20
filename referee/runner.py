@@ -157,6 +157,135 @@ def build(bot):
     _built[key] = _fingerprint(key)
 
 
+
+# ---------------------------------------------------------------- memory use of a bot process
+def rss_bytes(pid):
+    """Resident memory of a process in bytes (0 if it cannot be read). Linux: /proc; macOS: ps;
+    Windows: psapi via ctypes. Threads are inside the process, so a multi-threaded bot is covered;
+    children a bot spawns are not."""
+    if pid is None:
+        return 0
+    try:
+        if sys.platform.startswith('linux'):
+            with open(f'/proc/{pid}/statm') as f:
+                return int(f.read().split()[1]) * os.sysconf('SC_PAGE_SIZE')
+        if sys.platform == 'win32':
+            import ctypes
+            from ctypes import wintypes
+            class PMC(ctypes.Structure):
+                _fields_ = [('cb', wintypes.DWORD), ('PageFaultCount', wintypes.DWORD),
+                            ('PeakWorkingSetSize', ctypes.c_size_t), ('WorkingSetSize', ctypes.c_size_t),
+                            ('QuotaPeakPagedPoolUsage', ctypes.c_size_t), ('QuotaPagedPoolUsage', ctypes.c_size_t),
+                            ('QuotaPeakNonPagedPoolUsage', ctypes.c_size_t), ('QuotaNonPagedPoolUsage', ctypes.c_size_t),
+                            ('PagefileUsage', ctypes.c_size_t), ('PeakPagefileUsage', ctypes.c_size_t)]
+            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+            h = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, int(pid))
+            if not h:
+                return 0
+            try:
+                pmc = PMC(); pmc.cb = ctypes.sizeof(PMC)
+                if ctypes.windll.psapi.GetProcessMemoryInfo(h, ctypes.byref(pmc), pmc.cb):
+                    return int(pmc.WorkingSetSize)
+                return 0
+            finally:
+                ctypes.windll.kernel32.CloseHandle(h)
+        out = subprocess.run(['ps', '-o', 'rss=', '-p', str(pid)], capture_output=True, text=True, timeout=2).stdout.strip()
+        return int(out.split()[0]) * 1024 if out else 0
+    except Exception:
+        return 0
+
+
+def thread_count(pid):
+    """Number of threads in a process (0 if it cannot be read)."""
+    if pid is None:
+        return 0
+    try:
+        if sys.platform.startswith('linux'):
+            with open(f'/proc/{pid}/status') as f:
+                for line in f:
+                    if line.startswith('Threads:'):
+                        return int(line.split()[1])
+            return 0
+        if sys.platform == 'win32':
+            import ctypes
+            from ctypes import wintypes
+            TH32CS_SNAPTHREAD = 0x4
+            class THREADENTRY32(ctypes.Structure):
+                _fields_ = [('dwSize', wintypes.DWORD), ('cntUsage', wintypes.DWORD), ('th32ThreadID', wintypes.DWORD),
+                            ('th32OwnerProcessID', wintypes.DWORD), ('tpBasePri', wintypes.LONG),
+                            ('tpDeltaPri', wintypes.LONG), ('dwFlags', wintypes.DWORD)]
+            k32 = ctypes.windll.kernel32
+            snap = k32.CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0)
+            if snap == ctypes.c_void_p(-1).value:
+                return 0
+            try:
+                te = THREADENTRY32(); te.dwSize = ctypes.sizeof(THREADENTRY32)
+                n = 0
+                ok = k32.Thread32First(snap, ctypes.byref(te))
+                while ok:
+                    if te.th32OwnerProcessID == int(pid):
+                        n += 1
+                    ok = k32.Thread32Next(snap, ctypes.byref(te))
+                return n
+            finally:
+                k32.CloseHandle(snap)
+        out = subprocess.run(['ps', '-M', '-p', str(pid)], capture_output=True, text=True, timeout=2).stdout
+        lines = [l for l in out.splitlines() if l.strip()]
+        return max(0, len(lines) - 1)                 # one header line, then one line per thread
+    except Exception:
+        return 0
+
+
+def _parse_ps_time(txt):
+    """'[[DD-]HH:]MM:SS[.ff]' -> seconds."""
+    txt = txt.strip()
+    if not txt:
+        return 0.0
+    days = 0
+    if '-' in txt:
+        d, txt = txt.split('-', 1)
+        days = int(d)
+    parts = [float(x) for x in txt.split(':')]
+    while len(parts) < 3:
+        parts.insert(0, 0.0)
+    return days * 86400 + parts[0] * 3600 + parts[1] * 60 + parts[2]
+
+
+def cpu_seconds(pid):
+    """CPU time (user + system, all threads) a process has consumed, in seconds; 0 if unreadable."""
+    if pid is None:
+        return 0.0
+    try:
+        if sys.platform.startswith('linux'):
+            with open(f'/proc/{pid}/stat') as f:
+                fields = f.read().rsplit(')', 1)[1].split()
+            return (int(fields[11]) + int(fields[12])) / os.sysconf('SC_CLK_TCK')
+        if sys.platform == 'win32':
+            import ctypes
+            from ctypes import wintypes
+            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+            k32 = ctypes.windll.kernel32
+            h = k32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, int(pid))
+            if not h:
+                return 0.0
+            try:
+                c, e, kt, ut = wintypes.FILETIME(), wintypes.FILETIME(), wintypes.FILETIME(), wintypes.FILETIME()
+                if not k32.GetProcessTimes(h, ctypes.byref(c), ctypes.byref(e), ctypes.byref(kt), ctypes.byref(ut)):
+                    return 0.0
+                to_s = lambda ft: ((ft.dwHighDateTime << 32) + ft.dwLowDateTime) / 1e7
+                return to_s(kt) + to_s(ut)
+            finally:
+                k32.CloseHandle(h)
+        out = subprocess.run(['ps', '-o', 'utime=,stime=', '-p', str(pid)], capture_output=True, text=True, timeout=2).stdout
+        cols = out.split()
+        if len(cols) >= 2:
+            return _parse_ps_time(cols[0]) + _parse_ps_time(cols[1])
+        out = subprocess.run(['ps', '-o', 'cputime=', '-p', str(pid)], capture_output=True, text=True, timeout=2).stdout
+        return _parse_ps_time(out)
+    except Exception:
+        return 0.0
+
+
 class BotSession:
     """One running bot process for one game."""
 
@@ -256,8 +385,46 @@ def play_game(bots, config, clock, game=1, on_tick=None, delay=0, stop=None, liv
     """
     g = Game(config)
     clocks = [float(clock), float(clock)]
+    rss_peak = [0, 0]                # highest resident memory seen per role (bytes)
+    rss_last = [0, 0]
+    thr_peak = [0, 0]                # most threads seen per role
+    thr_last = [0, 0]
+    cpu_total = [0.0, 0.0]           # CPU seconds consumed per role (all threads)
+    cpu_rate = [0.0, 0.0]            # CPU seconds per wall second over the last sample interval (= cores busy)
+    cpu_prev = [0.0, 0.0]
+    cpu_base = [0.0, 0.0]            # CPU used before the first tick (startup, compilation): not counted
+    rss_at = 0.0
     if live is not None:
         live['clocks'], live['since'] = clocks, [None, None]
+        live['rss'], live['rss_peak'] = rss_last, rss_peak
+        live['threads'], live['threads_peak'] = thr_last, thr_peak
+        live['cpu'], live['cpu_rate'] = cpu_total, cpu_rate
+
+    def sample_rss(force=False):
+        nonlocal rss_at
+        now = time.monotonic()
+        if not force and now - rss_at < 0.5:
+            return
+        dt = now - rss_at if rss_at else 0.0
+        rss_at = now
+        for role in (0, 1):
+            proc = sessions[role].proc
+            if proc is None or proc.poll() is not None:
+                continue
+            b = rss_bytes(proc.pid)
+            if b:
+                rss_last[role] = b
+                rss_peak[role] = max(rss_peak[role], b)
+            n = thread_count(proc.pid)
+            if n:
+                thr_last[role] = n
+                thr_peak[role] = max(thr_peak[role], n)
+            c = cpu_seconds(proc.pid)
+            if c:
+                if dt > 0:
+                    cpu_rate[role] = max(0.0, (c - cpu_prev[role]) / dt)
+                cpu_prev[role] = c
+                cpu_total[role] = max(0.0, c - cpu_base[role])
     errors = [None, None]           # once set, that bot is no longer asked anything
     def frame():
         """After each tick (index = tick): positions, velocities after the move, seconds of budget
@@ -298,6 +465,10 @@ def play_game(bots, config, clock, game=1, on_tick=None, delay=0, stop=None, liv
             except BotError as exc:
                 errors[role] = f'startup: {exc}'
                 events.append({'tick': 0, 'error': {'role': ROLES[role], 'what': errors[role]}})
+        for role in (0, 1):                                   # CPU spent starting up is not the bot's thinking
+            proc = sessions[role].proc
+            if proc is not None and proc.poll() is None:
+                cpu_base[role] = cpu_prev[role] = cpu_seconds(proc.pid)
 
         while True:
             if errors[HUNTER]:
@@ -382,6 +553,7 @@ def play_game(bots, config, clock, game=1, on_tick=None, delay=0, stop=None, liv
                 ev['notes'] = notes + ev.get('notes', [])
             record(ev)
             frames.append(frame())
+            sample_rss()
             if on_tick:
                 on_tick(g, ev, clocks)
             if g.caught:
@@ -394,8 +566,9 @@ def play_game(bots, config, clock, game=1, on_tick=None, delay=0, stop=None, liv
                 else:
                     time.sleep(d)
         score = g.tick_cap if ended == 'hunter forfeit' else g.tick
+        sample_rss(force=True)
         return {'ticks': score, 'played': g.tick, 'ended': ended, 'caught': g.caught, 'frames': frames,
-                'events': events, 'errors': errors, 'clocks': clocks,
+                'events': events, 'errors': errors, 'clocks': clocks, 'rss_peak': rss_peak, 'threads_peak': thr_peak, 'cpu': [round(x, 2) for x in cpu_total],
                 'walls': [w.as_list() for w in g.grid.wall_list()]}
     finally:
         for s in sessions:

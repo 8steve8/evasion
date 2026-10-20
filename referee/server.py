@@ -119,6 +119,10 @@ class Tournament:
                 left.append(round(max(0.0, c['clocks'][role] - (now - since if since else 0)), 2))
                 thinking.append(since is not None)
             out['live_clocks'], out['thinking'] = left, thinking
+        if 'rss' in c:
+            out['rss'], out['rss_peak'] = list(c['rss']), list(c['rss_peak'])
+            out['threads'], out['threads_peak'] = list(c['threads']), list(c['threads_peak'])
+            out['cpu'], out['cpu_rate'] = [round(x, 2) for x in c['cpu']], [round(x, 2) for x in c['cpu_rate']]
         return out
 
     def start(self, req):

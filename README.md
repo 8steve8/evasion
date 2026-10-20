@@ -62,7 +62,10 @@ The page has four steps, then a live view and the results.
 
 ![The live view during a game](dashboard/screenshots/live.png)
 *Live view: the arena with the walls, the hunter (red, with its 4-unit catch circle) and the prey (green);
-positions, distance, both clocks, the scoreboard and the referee's log of walls built, removed and refused.*
+positions, distance, both clocks, each bot's memory use, thread count and CPU time (sampled twice a second; CPU seconds
+divided by budget used is the number of cores it kept busy — peaks and totals are saved in the results and shown
+at the end of the replay), the scoreboard and the
+referee's log of walls built, removed and refused.*
 
 ![A replay at the moment of the catch](dashboard/screenshots/replay.png)
 *Replay: the same view with a slider, step buttons (and the arrow keys), **Play** at 10 to 1000 ticks per second,
