@@ -390,8 +390,9 @@ def play_game(bots, config, clock, game=1, on_tick=None, delay=0, stop=None, liv
     thr_peak = [0, 0]                # most threads seen per role
     thr_last = [0, 0]
     cpu_total = [0.0, 0.0]           # CPU seconds consumed per role (all threads)
-    cpu_rate = [0.0, 0.0]            # CPU seconds per wall second over the last sample interval (= cores busy)
+    cpu_rate = [0.0, 0.0]            # CPU seconds per second of thinking over the last sample interval (= cores busy)
     cpu_prev = [0.0, 0.0]
+    clk_prev = [float(clock), float(clock)]   # budget left at the previous sample
     cpu_base = [0.0, 0.0]            # CPU used before the first tick (startup, compilation): not counted
     rss_at = 0.0
     if live is not None:
@@ -421,9 +422,15 @@ def play_game(bots, config, clock, game=1, on_tick=None, delay=0, stop=None, liv
                 thr_peak[role] = max(thr_peak[role], n)
             c = cpu_seconds(proc.pid)
             if c:
-                if dt > 0:
-                    cpu_rate[role] = max(0.0, (c - cpu_prev[role]) / dt)
-                cpu_prev[role] = c
+                thought = clk_prev[role] - clocks[role]          # seconds of budget spent since the last sample
+                if thought > 0.02:                               # otherwise it did not think: keep the last rate
+                    cpu_rate[role] = max(0.0, (c - cpu_prev[role]) / thought)
+                    cpu_prev[role] = c
+                    clk_prev[role] = clocks[role]
+                elif c - cpu_prev[role] > 0.5 and dt > 0:        # burning CPU while not being asked: show that per wall second
+                    cpu_rate[role] = (c - cpu_prev[role]) / dt
+                    cpu_prev[role] = c
+                    clk_prev[role] = clocks[role]
                 cpu_total[role] = max(0.0, c - cpu_base[role])
     errors = [None, None]           # once set, that bot is no longer asked anything
     def frame():

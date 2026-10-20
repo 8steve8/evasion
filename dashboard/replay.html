@@ -50,7 +50,7 @@ input[type=range]{width:100%;margin:12px 0 4px}
       <div class="budget"><div id="h_bar"></div></div>
       <div class="stat"><span class="muted">Budget used</span><b id="h_used" class="muted"></b></div>
       <div class="stat"><span class="muted">RAM</span><b id="h_ram" class="muted"></b></div>
-      <div class="stat"><span class="muted">CPU</span><b id="h_cpu" class="muted"></b></div>
+      <div class="stat"><span class="muted" title="cores busy now / average over the game · peak threads">CPU</span><b id="h_cpu" class="muted"></b></div>
       <div class="stat"><span>Walls built so far</span><b id="h_built"></b></div>
       <div class="stat"><span>Walls standing</span><b id="h_standing"></b></div>
       <div class="stat"><span>Next wall allowed</span><b id="h_next"></b></div>
@@ -92,7 +92,7 @@ input[type=range]{width:100%;margin:12px 0 4px}
       <div class="budget"><div id="p_bar"></div></div>
       <div class="stat"><span class="muted">Budget used</span><b id="p_used" class="muted"></b></div>
       <div class="stat"><span class="muted">RAM</span><b id="p_ram" class="muted"></b></div>
-      <div class="stat"><span class="muted">CPU</span><b id="p_cpu" class="muted"></b></div>
+      <div class="stat"><span class="muted" title="cores busy now / average over the game · peak threads">CPU</span><b id="p_cpu" class="muted"></b></div>
       <div class="stat"><span>Moves on</span><b class="muted">odd ticks (1, 3, 5, …)</b></div>
       <div class="stat"><span>Next move</span><b id="p_next"></b></div>
       <div class="log" id="p_log"></div>
@@ -179,11 +179,11 @@ function ram(prefix, cur, peak) {
 function cpu(prefix, secs, used, rate, thrPeak) {
   const el = $(prefix + '_cpu');
   if (secs == null) { el.textContent = thrPeak ? `peak ${thrPeak} thread${thrPeak > 1 ? 's' : ''}` : '–'; return; }
-  const parts = [];
-  if (used > 0.05) parts.push(`${(secs / used).toFixed(1)} cores avg`);
-  if (rate != null) parts.push(`now ${rate.toFixed(1)}`);
-  if (thrPeak) parts.push(`${thrPeak} thread${thrPeak > 1 ? 's' : ''}`);
-  el.textContent = parts.length ? parts.join(' · ') : '–';
+  // "now / avg cores · threads": cores busy over the last half second, then averaged over the game
+  const avg = used > 0.05 ? (secs / used).toFixed(1) : null;
+  let txt = rate != null && avg ? `${rate.toFixed(1)} / ${avg} avg cores` : avg ? `${avg} avg cores` : rate != null ? `${rate.toFixed(1)} cores` : '';
+  if (thrPeak) txt += (txt ? ' · ' : '') + `${thrPeak} thr`;
+  el.textContent = txt || '–';
 }
 function panel(now, tick, clocks, thinking, rss, rssPeak, thr, thrPeak, cpuS, cpuRate) {
   const N = PARAMS.N, M = PARAMS.M;
