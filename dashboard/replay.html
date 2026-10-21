@@ -180,6 +180,8 @@ function cpu(prefix, secs, used, rate, thrPeak) {
   const el = $(prefix + '_cpu');
   if (secs == null) { el.textContent = thrPeak ? `peak ${thrPeak} thread${thrPeak > 1 ? 's' : ''}` : '–'; return; }
   // "now / avg cores · threads": cores busy over the last half second, then averaged over the game
+  // no CPU reading at all (secs 0 while the bot has clearly thought): show nothing rather than 0.0
+  if (!(secs > 0) && used > 1) { el.textContent = (thrPeak ? `${thrPeak} thr` : '–'); return; }
   const avg = used > 0.05 ? (secs / used).toFixed(1) : null;
   let txt = rate != null && avg ? `${rate.toFixed(1)} / ${avg} avg cores` : avg ? `${avg} avg cores` : rate != null ? `${rate.toFixed(1)} cores` : '';
   if (thrPeak) txt += (txt ? ' · ' : '') + `${thrPeak} thr`;

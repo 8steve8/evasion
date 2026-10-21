@@ -3,7 +3,6 @@ __pycache__/
 /results/
 /bots/**/bot
 /bots/**/bot.exe
-.DS_Store
 
 # Players' bots stay private: only the templates and samples are tracked.
 /bots/*

@@ -58,7 +58,7 @@ def build_all(bots):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('--bots', nargs='+', help='bot names from bots.json (default: all)')
+    ap.add_argument('--bots', nargs='+', help='bot names from bots.json (default: every bot except the built-in samples)')
     ap.add_argument('--registry', default='bots.json')
     ap.add_argument('--config', help='use this one parameter file for every pairing')
     ap.add_argument('--clock', type=float, default=120, help='seconds per bot per game')
@@ -66,7 +66,8 @@ def main():
     args = ap.parse_args()
 
     roster = {b['name']: b for b in load_bots(args.registry)}
-    names = args.bots or list(roster)
+    players = [n for n, b in roster.items() if not b.get('sample')]       # the sample bots are not entrants
+    names = args.bots or (players if len(players) >= 2 else list(roster))
     missing = [n for n in names if n not in roster]
     if len(names) < 2 or missing:
         raise ValueError(f'Pick at least two bots from: {", ".join(roster)}')

@@ -80,7 +80,7 @@ class Tournament:
 
     def setup(self):
         bots = load_bots(self.registry)
-        return {'bots': [{'key': b['name'], 'name': b['name']} for b in bots],
+        return {'bots': [{'key': b['name'], 'name': b['name'], 'sample': bool(b.get('sample'))} for b in bots],
                 'params': list_params(self.params_dirs),
                 'params_dir': ' and '.join(d + '/' for d in self.params_dirs)}
 

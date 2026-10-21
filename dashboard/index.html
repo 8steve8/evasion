@@ -124,7 +124,7 @@ $('addPair').onclick=()=>{ const ks=SETUP.bots.map(b=>b.key);
   outer: for(let i=0;i<ks.length;i++) for(let j=i+1;j<ks.length;j++) if(!used.has([ks[i],ks[j]].sort().join('|'))){pick=[ks[i],ks[j]];break outer;}
   const last=custom[custom.length-1], par=last?{N:last.N,M:last.M,tick_cap:last.tick_cap}:defaults();
   custom.push({a:pick[0],b:pick[1],...par}); renderPlan(); };
-$('allPairs').onclick=()=>{ const ks=SETUP.bots.map(b=>b.key); const last=custom[custom.length-1], par=last?{N:last.N,M:last.M,tick_cap:last.tick_cap}:defaults(); custom=[];
+$('allPairs').onclick=()=>{ const players=SETUP.bots.filter(b=>!b.sample); const ks=(players.length>=2?players:SETUP.bots).map(b=>b.key); const last=custom[custom.length-1], par=last?{N:last.N,M:last.M,tick_cap:last.tick_cap}:defaults(); custom=[];
   for(let i=0;i<ks.length;i++) for(let j=i+1;j<ks.length;j++) custom.push({a:ks[i],b:ks[j],...par}); renderPlan(); };
 $('rescan').onclick=loadSetup;
 $('newp').onclick=()=>{ $('pform').hidden=false; $('pname').focus(); };

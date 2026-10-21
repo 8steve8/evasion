@@ -51,7 +51,8 @@ The page has four steps, then a live view and the results.
    must wait between walls), **M** (most walls standing at once) and optionally the **tick cap**
    (default 24,000). Drop a new file in and press **Rescan folder**, or press **Add your own**.
    From the terminal: `python3 start.py params --n 10 --m 5 --out params/my_game.txt`
-3. **Pairings:** press **Add pairing** (or **Every pair** for a round robin), pick Bot 1 and Bot 2,
+3. **Pairings:** press **Add pairing** (or **Every pair** for a round robin of the players' bots; the
+   built-in sample bots are left out unless they are all there is), pick Bot 1 and Bot 2,
    and type **N**, **M** and the **tick cap** for that pairing, or choose a preset to fill them in.
    Bot 1 hunts in game 1; Bot 2 hunts in game 2.
 4. **Start tournament.** The page scrolls down to the live view. **Stop** ends the run early;

@@ -88,6 +88,8 @@ def load_bots(path='bots.json'):
                 raise ValueError(f'{name}: "{key}" must be a non-empty list of strings')
             bot[key] = [_resolve(x, cwd) for x in cmd]
         bot['cwd'] = str(cwd)
+        samples = (path.parent / 'bots' / 'samples').resolve()
+        bot['sample'] = samples == cwd or samples in cwd.parents   # ships with the architecture, not a player's bot
     return entries
 
 
@@ -179,16 +181,23 @@ def rss_bytes(pid):
                             ('QuotaPeakNonPagedPoolUsage', ctypes.c_size_t), ('QuotaNonPagedPoolUsage', ctypes.c_size_t),
                             ('PagefileUsage', ctypes.c_size_t), ('PeakPagefileUsage', ctypes.c_size_t)]
             PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-            h = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, int(pid))
+            k32 = ctypes.WinDLL('kernel32', use_last_error=True)
+            psapi = ctypes.WinDLL('psapi', use_last_error=True)
+            k32.OpenProcess.restype = wintypes.HANDLE
+            k32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+            k32.CloseHandle.argtypes = [wintypes.HANDLE]
+            psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
+            psapi.GetProcessMemoryInfo.argtypes = [wintypes.HANDLE, ctypes.POINTER(PMC), wintypes.DWORD]
+            h = k32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, int(pid))
             if not h:
                 return 0
             try:
                 pmc = PMC(); pmc.cb = ctypes.sizeof(PMC)
-                if ctypes.windll.psapi.GetProcessMemoryInfo(h, ctypes.byref(pmc), pmc.cb):
+                if psapi.GetProcessMemoryInfo(h, ctypes.byref(pmc), pmc.cb):
                     return int(pmc.WorkingSetSize)
                 return 0
             finally:
-                ctypes.windll.kernel32.CloseHandle(h)
+                k32.CloseHandle(h)
         out = subprocess.run(['ps', '-o', 'rss=', '-p', str(pid)], capture_output=True, text=True, timeout=2).stdout.strip()
         return int(out.split()[0]) * 1024 if out else 0
     except Exception:
@@ -264,7 +273,12 @@ def cpu_seconds(pid):
             import ctypes
             from ctypes import wintypes
             PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-            k32 = ctypes.windll.kernel32
+            k32 = ctypes.WinDLL('kernel32', use_last_error=True)
+            k32.OpenProcess.restype = wintypes.HANDLE
+            k32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+            k32.GetProcessTimes.restype = wintypes.BOOL
+            k32.GetProcessTimes.argtypes = [wintypes.HANDLE] + [ctypes.POINTER(wintypes.FILETIME)] * 4
+            k32.CloseHandle.argtypes = [wintypes.HANDLE]
             h = k32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, int(pid))
             if not h:
                 return 0.0
@@ -284,6 +298,69 @@ def cpu_seconds(pid):
         return _parse_ps_time(out)
     except Exception:
         return 0.0
+
+
+def child_map():
+    """{parent pid: [child pids]} for all processes (best effort; {} if unreadable)."""
+    kids = {}
+    try:
+        if sys.platform.startswith('linux'):
+            for name in os.listdir('/proc'):
+                if not name.isdigit():
+                    continue
+                try:
+                    with open(f'/proc/{name}/stat') as f:
+                        ppid = int(f.read().rsplit(')', 1)[1].split()[1])
+                except Exception:
+                    continue
+                kids.setdefault(ppid, []).append(int(name))
+        elif sys.platform == 'win32':
+            import ctypes
+            from ctypes import wintypes
+            TH32CS_SNAPPROCESS = 0x2
+            class PROCESSENTRY32(ctypes.Structure):
+                _fields_ = [('dwSize', wintypes.DWORD), ('cntUsage', wintypes.DWORD), ('th32ProcessID', wintypes.DWORD),
+                            ('th32DefaultHeapID', ctypes.POINTER(ctypes.c_ulong)), ('th32ModuleID', wintypes.DWORD),
+                            ('cntThreads', wintypes.DWORD), ('th32ParentProcessID', wintypes.DWORD),
+                            ('pcPriClassBase', wintypes.LONG), ('dwFlags', wintypes.DWORD), ('szExeFile', ctypes.c_char * 260)]
+            k32 = ctypes.WinDLL('kernel32', use_last_error=True)
+            k32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+            k32.Process32First.argtypes = [wintypes.HANDLE, ctypes.POINTER(PROCESSENTRY32)]
+            k32.Process32Next.argtypes = [wintypes.HANDLE, ctypes.POINTER(PROCESSENTRY32)]
+            k32.CloseHandle.argtypes = [wintypes.HANDLE]
+            snap = k32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+            if snap and snap != wintypes.HANDLE(-1).value:
+                try:
+                    pe = PROCESSENTRY32(); pe.dwSize = ctypes.sizeof(PROCESSENTRY32)
+                    ok = k32.Process32First(snap, ctypes.byref(pe))
+                    while ok:
+                        kids.setdefault(int(pe.th32ParentProcessID), []).append(int(pe.th32ProcessID))
+                        ok = k32.Process32Next(snap, ctypes.byref(pe))
+                finally:
+                    k32.CloseHandle(snap)
+        else:
+            out = subprocess.run(['ps', '-axo', 'pid=,ppid='], capture_output=True, text=True, timeout=2).stdout
+            for line in out.splitlines():
+                parts = line.split()
+                if len(parts) == 2:
+                    kids.setdefault(int(parts[1]), []).append(int(parts[0]))
+    except Exception:
+        pass
+    return kids
+
+
+def process_tree(pid):
+    """The process and all its descendants (a launcher such as juliaup's julia.exe starts the real
+    bot as a child, and a bot may fork workers)."""
+    kids = child_map()
+    seen, todo = [], [int(pid)]
+    while todo:
+        q = todo.pop()
+        if q in seen:
+            continue
+        seen.append(q)
+        todo.extend(kids.get(q, []))
+    return seen
 
 
 class BotSession:
@@ -318,7 +395,7 @@ class BotSession:
     def _read_err(self):
         for line in self.proc.stderr:      # keep a short tail for error messages
             self.stderr_bytes += len(line)
-            self.stderr_tail = (self.stderr_tail + [line])[-5:]
+            self.stderr_tail = (self.stderr_tail + [line])[-20:]
 
     def ask(self, msg, timeout):
         """Send one message, wait for one JSON reply. Returns (reply, seconds)."""
@@ -412,15 +489,16 @@ def play_game(bots, config, clock, game=1, on_tick=None, delay=0, stop=None, liv
             proc = sessions[role].proc
             if proc is None or proc.poll() is not None:
                 continue
-            b = rss_bytes(proc.pid)
+            tree = process_tree(proc.pid)                    # the bot may be a child of a launcher
+            b = sum(rss_bytes(q) for q in tree)
             if b:
                 rss_last[role] = b
                 rss_peak[role] = max(rss_peak[role], b)
-            n = thread_count(proc.pid)
+            n = sum(thread_count(q) for q in tree)
             if n:
                 thr_last[role] = n
                 thr_peak[role] = max(thr_peak[role], n)
-            c = cpu_seconds(proc.pid)
+            c = sum(cpu_seconds(q) for q in tree)
             if c:
                 thought = clk_prev[role] - clocks[role]          # seconds of budget spent since the last sample
                 if thought > 0.02:                               # otherwise it did not think: keep the last rate
@@ -475,7 +553,7 @@ def play_game(bots, config, clock, game=1, on_tick=None, delay=0, stop=None, liv
         for role in (0, 1):                                   # CPU spent starting up is not the bot's thinking
             proc = sessions[role].proc
             if proc is not None and proc.poll() is None:
-                cpu_base[role] = cpu_prev[role] = cpu_seconds(proc.pid)
+                cpu_base[role] = cpu_prev[role] = sum(cpu_seconds(q) for q in process_tree(proc.pid))
 
         while True:
             if errors[HUNTER]:
@@ -576,6 +654,7 @@ def play_game(bots, config, clock, game=1, on_tick=None, delay=0, stop=None, liv
         sample_rss(force=True)
         return {'ticks': score, 'played': g.tick, 'ended': ended, 'caught': g.caught, 'frames': frames,
                 'events': events, 'errors': errors, 'clocks': clocks, 'rss_peak': rss_peak, 'threads_peak': thr_peak, 'cpu': [round(x, 2) for x in cpu_total],
+                'stderr': [''.join(sessions[r].stderr_tail)[-600:] for r in (0, 1)],   # last lines each bot printed
                 'walls': [w.as_list() for w in g.grid.wall_list()]}
     finally:
         for s in sessions:
