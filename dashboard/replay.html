@@ -10,6 +10,7 @@ main{max-width:1500px}
 .center{display:grid;gap:16px;min-width:0}
 canvas{width:min(100%,calc(100vh - 430px));min-width:280px}
 .compact canvas{width:min(100%,calc(100vh - 330px))}
+body.focus .desk{grid-template-columns:minmax(240px,300px) minmax(0,1fr) minmax(240px,300px);gap:12px}body.focus header{display:none}body.focus .hunter,body.focus .prey{max-height:calc(100vh - 90px);overflow:auto;font-size:13px}body.focus .hunter .log,body.focus .prey .log{max-height:none}body.focus .kpis{display:flex;flex-wrap:wrap;gap:6px 28px;align-items:baseline}body.focus .kpi{display:flex;gap:8px;align-items:baseline}body.focus .kpi .big{font-size:18px}body.focus .legend{font-size:26px;gap:28px;align-items:center;margin-top:10px}body.focus .legend span::before{width:20px;height:20px;margin-right:10px;vertical-align:-2px}body.focus .legend .muted{font-size:20px}body.focus #focusbtn{font-size:16px}body.focus .center>.card:first-child{padding:8px 16px}body.focus canvas{width:min(100% - 8px,calc(100vh - 210px))}body.focus main{max-width:none;margin:6px auto;padding:6px 12px}body.focus .compact canvas{width:min(100% - 8px,calc(100vh - 210px))}#focusbtn{margin-left:auto}
 @media(max-width:1000px){.desk{grid-template-columns:1fr 1fr}.center.main{grid-column:1 / -1;order:-1}canvas{width:min(100%,640px)}}
 @media(max-width:640px){.desk{grid-template-columns:1fr}}
 .card{background:var(--card);padding:16px;border:1px solid var(--line);border-radius:16px;min-width:0}
@@ -22,8 +23,9 @@ canvas{aspect-ratio:1;display:block;margin:0 auto;background:#0b1118;border:1px 
 .who{display:flex;align-items:center;gap:10px;margin:0 0 8px}.who h2{margin:0;overflow-wrap:anywhere}.dot{width:14px;height:14px;border-radius:50%;flex:none}
 .role{font-size:12px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase}
 .big{font-size:26px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
-.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
-.kpi{background:var(--field);border:1px solid var(--line);border-radius:10px;padding:10px 12px}.kpi .lbl{font-size:12px;color:var(--muted)}
+.winname{font-size:34px;font-weight:800;line-height:1.1;color:var(--amber);overflow-wrap:anywhere}body.focus .winname{font-size:40px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.kpi{background:var(--field);border:1px solid var(--line);border-radius:10px;padding:10px 12px}.lbl{font-size:12px;color:var(--muted)}
 .sb{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:14px;margin-top:6px}
 .sb th,.sb td{padding:7px 5px;border-bottom:1px solid var(--line);text-align:left}.sb td.num,.sb th.num,.sb td:first-child,.sb th:first-child{white-space:nowrap}.sb th{color:var(--muted);font-weight:500;font-size:12px}
 .sb td.num,.sb th.num{text-align:right}.sb tr.g{cursor:pointer}.sb tr.g:hover td{background:#22384a}.sb tr.cur td{background:#203447}
@@ -63,13 +65,12 @@ input[type=range]{width:100%;margin:12px 0 4px}
           <div class="kpi"><div class="lbl" id="gamehead">Game</div><div class="big" id="tick">0</div><div class="lbl">tick</div></div>
           <div class="kpi"><div class="lbl">Distance</div><div class="big" id="dist">–</div><div class="lbl">catch at ≤ 4, clear line</div></div>
           <div class="kpi"><div class="lbl">Walls standing</div><div class="big" id="nwalls">0</div><div class="lbl">of M</div></div>
-          <div class="kpi"><div class="lbl">This tick</div><div class="big" id="turn" style="font-size:17px;padding-top:6px"></div></div>
-          <div class="kpi"><div class="lbl">Status</div><div id="status" style="font-size:13.5px;line-height:1.35;padding-top:4px"></div></div>
+          <div class="kpi"><div class="lbl">Moving this tick</div><div id="turn" style="font-size:15px;line-height:1.35;padding-top:3px;font-weight:600"><div>Hunter</div><div id="turn_p">Prey</div></div></div>
         </div>
       </section>
       <section class="card">
         <canvas id="arena" width="300" height="300" aria-label="The arena"></canvas>
-        <div class="legend"><span class="h">Hunter</span><span class="p">Prey</span><span class="w">Walls</span><span id="cap" class="muted"></span></div>
+        <div class="legend"><span class="h" id="lg_h">Hunter</span><span class="p" id="lg_p">Prey</span><span class="w">Walls</span><span id="cap" class="muted"></span><button class="ghost" id="focusbtn" title="Big board (F); Esc to leave">⛶ Big board</button></div>
         <div id="replayctl" hidden>
           <input type="range" id="slider" min="0" max="0" value="0" aria-label="Tick">
           <div class="controls">
@@ -99,8 +100,9 @@ input[type=range]{width:100%;margin:12px 0 4px}
     </section>
     <section class="card">
         <h2>Scoreboard</h2>
-        <div style="overflow-x:auto"><table class="sb"><thead><tr><th>Game</th><th>Hunter</th><th>Prey</th><th class="num">Ticks</th><th>Ended</th></tr></thead><tbody id="score"></tbody></table></div>
-        <p id="winner" style="margin:10px 0 0"></p>
+        <p id="status" class="muted" style="margin:0 0 8px;font-size:14px;line-height:1.4"></p>
+        <div style="overflow-x:auto"><table class="sb"><thead><tr><th>Game</th><th>Prey</th><th class="num">Ticks</th><th>Ended</th></tr></thead><tbody id="score"></tbody></table></div>
+        <div id="winner" style="margin:12px 0 0"></div>
     </section>
     </div>
   </div>
@@ -115,6 +117,16 @@ if (location.search.includes('compact') || (LIVE && window.self !== window.top))
 
 // ---- drawing ----
 const cv = $('arena'), ctx = cv.getContext('2d');
+// Big board: hide the side cards so the arena takes the screen; goes fullscreen when the browser allows it.
+function setFocus(on) {
+  document.body.classList.toggle('focus', on);
+  $('focusbtn').textContent = on ? '⛶ Normal view' : '⛶ Big board';
+  if (on && !document.fullscreenElement && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
+  if (!on && document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+}
+$('focusbtn').onclick = () => setFocus(!document.body.classList.contains('focus'));
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) document.body.classList.remove('focus'), $('focusbtn').textContent = '⛶ Big board'; });
+document.addEventListener('keydown', e => { if (e.key === 'f' || e.key === 'F') setFocus(!document.body.classList.contains('focus')); else if (e.key === 'Escape') setFocus(false); });
 const S = 3; cv.width = 300 * S; cv.height = 300 * S;         // 3 canvas pixels per arena unit
 function wallCells(w) {                                          // same rule as the referee
   let [x1, y1, x2, y2] = w; if (x2 < x1 || (x2 === x1 && y2 < y1)) [x1, y1, x2, y2] = [x2, y2, x1, y1];
@@ -192,7 +204,7 @@ function panel(now, tick, clocks, thinking, rss, rssPeak, thr, thrPeak, cpuS, cp
   $('tick').textContent = tick;
   const d = Math.hypot(now.hx - now.px, now.hy - now.py); $('dist').textContent = d.toFixed(1); $('dist').className = 'big' + (d <= 8 ? ' low' : '');
   $('nwalls').textContent = M != null ? `${now.walls.length} / ${M}` : now.walls.length;
-  $('turn').textContent = tick % 2 === 1 ? 'hunter + prey move' : 'hunter moves';
+  $('turn_p').style.opacity = tick % 2 === 1 ? '1' : '0.35';           // prey moves on odd ticks; same two lines every tick, so nothing below jumps
   // hunter
   $('h_pos').textContent = `(${now.hx}, ${now.hy})`;
   const hb = now.heading_h && (now.heading_h[0] !== now.hvx || now.heading_h[1] !== now.hvy);
@@ -216,14 +228,15 @@ function panel(now, tick, clocks, thinking, rss, rssPeak, thr, thrPeak, cpuS, cp
   $('p_next').textContent = tick % 2 === 0 ? 'next tick' : 'this tick';
 }
 function scoreboard(games, cur) {
-  $('score').innerHTML = games.map(g => `<tr class="g ${g.game === cur ? 'cur' : ''}" data-g="${g.game}"><td>${g.game}</td><td>${esc(g.hunter)}</td><td>${esc(g.prey)}</td><td class="num">${g.ticks != null ? g.ticks : (g.tick || 0)}</td><td>${g.status === 'finished' ? esc(g.ended) : esc(g.status || '')}</td></tr>`).join('');
+  $('score').innerHTML = games.map(g => `<tr class="g ${g.game === cur ? 'cur' : ''}" data-g="${g.game}"><td>${g.game}</td><td title="hunter: ${esc(g.hunter)}">${esc(g.prey)}</td><td class="num">${g.ticks != null ? g.ticks : (g.tick || 0)}</td><td>${g.status === 'finished' ? esc(g.ended) : esc(g.status || '')}</td></tr>`).join('');
   const done = games.filter(g => g.status === 'finished');
-  if (done.length === 2) { const [a, b] = done;
-    const w = a.ticks < b.ticks ? a.hunter : b.ticks < a.ticks ? b.hunter : null;
-    $('winner').innerHTML = w ? `Winner: <span class="tag win">${esc(w)}</span> <span class="muted" style="font-size:13px">(its hunter needed fewer ticks)</span>` : `<span class="tag">Tie</span> <span class="muted" style="font-size:13px">(same number of ticks)</span>`; }
+  if (done.length === 2) { const [a, b] = done; const ta = a.ticks != null ? a.ticks : a.tick, tb = b.ticks != null ? b.ticks : b.tick;
+    const w = ta < tb ? a.hunter : tb < ta ? b.hunter : null;
+    $('winner').innerHTML = w ? `<div class="lbl">Winner</div><div class="winname">${esc(w)}</div><div class="muted" style="font-size:13px">its hunter needed fewer ticks</div>` : `<div class="lbl">Result</div><div class="winname">Tie</div><div class="muted" style="font-size:13px">same number of ticks</div>`; }
   else $('winner').textContent = '';
 }
-function names(g) { $('gamehead').textContent = `Game ${g.game} of 2`; $('hname').textContent = g.hunter; $('pname').textContent = g.prey; }
+function names(g) { $('gamehead').textContent = `Game ${g.game} of 2`; $('hname').textContent = g.hunter; $('pname').textContent = g.prey;
+  $('lg_h').textContent = `Hunter · ${g.hunter}`; $('lg_p').textContent = `Prey · ${g.prey}`; }
 
 if (LIVE) {
   // ---- live view: ask the referee what is happening right now ----

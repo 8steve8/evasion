@@ -62,6 +62,8 @@ The page has four steps, then a live view and the results.
 </details>
 
 ![The live view during a game](dashboard/screenshots/live.png)
+
+Press **⛶ Big board** (or `F`) on the live view or a replay for a fullscreen arena; `Esc` returns.
 *Live view: the arena with the walls, the hunter (red, with its 4-unit catch circle) and the prey (green);
 positions, distance, both clocks, each bot's memory use, thread count and CPU time (sampled twice a second; CPU seconds
 divided by budget used is the number of cores it kept busy — peaks and totals are saved in the results and shown
